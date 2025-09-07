@@ -3,6 +3,10 @@
   "description": "General meta-shims for tools under C:\\Tools\\apps\\*\\*\\current (+plugins) with dry-run, versioned names, and summary map.",
   "homepage": "https://github.com/meibye",
   "license": "Proprietary",
+  "architecture": {
+    "64bit": {},
+    "32bit": {}
+  },
   "persist": ["state"],
   "installer": {
     "script": [
