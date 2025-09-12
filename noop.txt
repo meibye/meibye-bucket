@@ -1,0 +1,1 @@
+This is a dummy file used as a placeholder download for Scoop manifests that only execute scripts and do not require an actual installer.
