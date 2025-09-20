@@ -17,7 +17,7 @@
           "if (Test-Path $mapFile) { Remove-Item $mapFile -Force }",
           "",
           "# Controls:",
-          "# MEIBYE_META_FAMILIES = 'onemore,py-tools' (optional filter)",
+          "# MEIBYE_META_FAMILIES = 'onemore,py,ps' (optional filter)",
           "# MEIBYE_META_INCLUDE_VERSION = '1' to include version in shim name",
           "# MEIBYE_META_DRYRUN = '1' to only print plan and write summary map",
           "",
@@ -166,7 +166,7 @@
           "if (Test-Path $mapFile) { Remove-Item $mapFile -Force }",
           "",
           "# Controls:",
-          "# MEIBYE_META_FAMILIES = 'onemore,py-tools' (optional filter)",
+          "# MEIBYE_META_FAMILIES = 'onemore,py,ps' (optional filter)",
           "# MEIBYE_META_INCLUDE_VERSION = '1' to include version in shim name",
           "# MEIBYE_META_DRYRUN = '1' to only print plan and write summary map",
           "",
@@ -315,7 +315,7 @@
           "if (Test-Path $mapFile) { Remove-Item $mapFile -Force }",
           "",
           "# Controls:",
-          "# MEIBYE_META_FAMILIES = 'onemore,py-tools' (optional filter)",
+          "# MEIBYE_META_FAMILIES = 'onemore,py,ps' (optional filter)",
           "# MEIBYE_META_INCLUDE_VERSION = '1' to include version in shim name",
           "# MEIBYE_META_DRYRUN = '1' to only print plan and write summary map",
           "",
@@ -471,7 +471,7 @@
     "Shim naming: <family>-<plugin>-<tool> (plugins) or <family>-<app>-<tool> (root).",
     "Set MEIBYE_META_INCLUDE_VERSION=1 to append '-v<version>' (derived from the 'current' target).",
     "Set MEIBYE_META_DRYRUN=1 to plan only; creates 'state\\shims-map.csv' without creating shims.",
-    "Set MEIBYE_META_FAMILIES=onemore,py-tools to limit scanning.",
+    "Set MEIBYE_META_FAMILIES=onemore,py,ps to limit scanning.",
     "Summary map written to 'state\\shims-map.csv' with shim→target and metadata."
   ]
 }
