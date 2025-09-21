@@ -1,22 +1,14 @@
 {
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Minimal test manifest for Scoop PowerShell execution.",
-  "homepage": "https://github.com/meibye",
-  "license": "Proprietary",
+  "homepage": "https://github.com/meibye/meibye-bucket",
+  "license": "MIT",
   "architecture": {
     "64bit": {
       "installer": {
-        "script": "Write-Host 'Hello from PowerShell'"
-      }
-    },
-    "32bit": {
-      "installer": {
-        "script": "Write-Host 'Hello from PowerShell'"
-      }
-    },
-    "arm64": {
-      "installer": {
-        "script": "Write-Host 'Hello from PowerShell'"
+        "script":  [
+          "Write-Host 'Hello from PowerShell'"
+        ]
       }
     }
   }

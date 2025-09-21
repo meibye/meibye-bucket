@@ -1,0 +1,16 @@
+{
+    "version": "1.0.0",
+    "description": "app",
+    "homepage": "https://www.app.com",
+    "license": "MIT",
+    "url": "https://raw.githubusercontent.com/meibye/meibye-bucket/main/noop.txt",
+    "architecture": {
+        "64bit": {
+            "installer": {
+                "script": [
+                    "Write-Host 'Hello from PowerShell'"
+                ]
+            }
+        }
+    }
+}
