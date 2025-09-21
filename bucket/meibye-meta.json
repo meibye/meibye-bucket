@@ -1,5 +1,5 @@
 {
-  "version": "2025.09.21.2",
+  "version": "2025.09.21.3",
   "description": "General meta-shims for tools under C:\\Tools\\apps\\*\\*\\current (+plugins) with dry-run, versioned names, and summary map.",
   "homepage": "https://github.com/meibye/meibye-bucket",
   "url": "https://raw.githubusercontent.com/meibye/meibye-bucket/main/noop.txt",
@@ -345,9 +345,12 @@
   },
   "notes": [
     "Shim naming: <family>-<plugin>-<tool> (plugins) or <family>-<app>-<tool> (root).",
+    "",
     "Set MEIBYE_META_INCLUDE_VERSION=1 to append '-v<version>' (derived from the 'current' target).",
     "Set MEIBYE_META_DRYRUN=1 to plan only; creates 'state\\shims-map.csv' without creating shims.",
     "Set MEIBYE_META_FAMILIES=onemore,py,ps to limit scanning.",
+    "for PowerShell add $env: in front of the variable names.",
+    "",
     "Summary map written to 'state\\shims-map.csv' with shim→target and metadata."
   ]
 }
