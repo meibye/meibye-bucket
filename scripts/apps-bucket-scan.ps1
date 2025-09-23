@@ -3,13 +3,16 @@
     Creates shims for scripts in a directory tree for various app families, supporting PowerShell, Python, batch, and shell scripts.
 
 .DESCRIPTION
-    This script scans a root directory (default: C:\Tools\apps) for app families and their apps, then creates shims for scripts found in each app's 'current' directory and its plugins.
+    Scans a root directory (default: C:\Tools\apps) for app families and their apps, then creates Scoop shims for scripts found in each app's 'current' directory and its plugins.
     Shims are created using Scoop's 'shim add' command, with interpreter detection for PowerShell, Python, Git Bash, and WSL.
     The script supports filtering by family, including version in shim names, and dry-run mode.
-    It generates a summary CSV map and a state file listing all created shims.
+    It outputs a summary CSV map and a state file listing all created shims to the specified bucket folder (default: D:\Dev\meibye-bucket\bucket).
 
 .PARAMETER Root
     (Optional) Root directory to scan for app families. Default: C:\Tools\apps
+
+.PARAMETER OutBucket
+    (Optional) Output bucket folder where produced Scoop manifests and summary/state files are placed. Default: D:\Dev\meibye-bucket\bucket
 
 .PARAMETER Families
     (Optional) Comma-separated list of families to include (e.g., 'onemore,py,ps'). Overrides $env:MEIBYE_META_FAMILIES if set.
@@ -20,12 +23,9 @@
 .PARAMETER DryRun
     (Optional) Switch to only print plan and write summary map, without creating shims. Overrides $env:MEIBYE_META_DRYRUN if set.
 
-.PARAMETER OutBucket
-    (Optional) Output directory for the summary/state files. Default: ./state
-
 .OUTPUTS
-    - state/shims.txt: List of created shims.
-    - state/shims-map.csv: CSV summary of all shims and their properties.
+    - shims.txt: List of created shims (in OutBucket).
+    - shims-map.csv: CSV summary of all shims and their properties (in OutBucket).
 
 .NOTES
     - Requires Scoop to be installed and available in PATH.
