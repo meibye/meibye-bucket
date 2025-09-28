@@ -1,144 +1,182 @@
 <#
 .SYNOPSIS
-    Runs Scoop's checkver.ps1 against your bucket for the apps-bucket-scan manifest.
+    Wrapper for Scoop's checkver.ps1 with argument normalization, static help, and detail output support.
 
 .DESCRIPTION
-    This script locates Scoop's own app folder, then runs checkver.ps1 for the apps-bucket-scan manifest in your bucket.
-    All arguments are passed as a single string via the -Args parameter. The script splits this string into arguments, handles 'help' and 'verbose' locally, and passes the rest to checkver.ps1.
-    If '-Dir <folder>' is not specified, it prepends '-Dir D:\Dev\meibye-bucket\bucket' to the arguments by default.
+    This script wraps Scoop's checkver.ps1 for the apps-bucket-scan manifest. It accepts arguments via -Args, normalizes them, handles -help and -detail locally, inserts -Dir D:\Dev\meibye-bucket\bucket if missing, and passes the final arguments to checkver.ps1. Help output is static and documents supported parameters.
 
 .PARAMETER Args
-    String of arguments to pass. Handles 'help' and 'verbose' locally, passes the rest to checkver.ps1.
+    String of arguments to pass. Handles 'help' and 'detail' locally, normalizes argument order, and passes the rest to checkver.ps1.
 #>
 
 param(
-    [string]$Args = ""
+    # Accept all arguments as a single string via -Args, or as a splatted array
+    [Parameter(Position=0, ValueFromRemainingArguments=$true)]
+    [string[]]$Args
 )
 
-# Split arguments
-$argsList = @()
-if ($Args) {
-    # Split arguments on whitespace, but preserve quoted substrings
-    $argsList = @()
-    if ($Args) {
-        # Properly escape single quotes inside the pattern for PowerShell
-        $pattern = '("[^""]*"|''[^'']*''|\S+)'
-        $matches = [regex]::Matches($Args, $pattern)
-        foreach ($m in $matches) {
-            $arg = $m.Value
-            # Remove surrounding quotes if present
-            if (($arg.StartsWith('"') -and $arg.EndsWith('"')) -or ($arg.StartsWith("'") -and $arg.EndsWith("'"))) {
-                $arg = $arg.Substring(1, $arg.Length - 2)
-            }
-            $argsList += $arg
-        }
-    }
+# Normalize $ArgLine to be a single string of all arguments, preserving spaces/quotes
+if ($Args.Count -eq 1 -and $Args[0] -is [string]) {
+    $ArgLine = $Args[0]
 } else {
-    $argsList = @()
+    $ArgLine = ($Args | ForEach-Object { $_ }) -join ' '
 }
 
-# Handle help/verbose
-$help = $false
-$verbose = $false
-$remainingArgs = @()
-foreach ($a in $argsList) {
-    if ($a -ieq '-help' -or $a -ieq '/?' -or $a -ieq '--help') { $help = $true }
-    elseif ($a -ieq '-verbose' -or $a -ieq '--verbose') { $verbose = $true }
-    else { $remainingArgs += $a }
+# Local-only flags that parent consumes (do NOT forward)
+# initialize to #null for string
+# Example: -verbose (switch), -help (switch)
+$LocalOnlyParams = @{
+    Help = $false  
+    Detail = $false
+    DryRun = $false
 }
 
-# Get the path to Scoop's own app folder
-$SCOOPROOT = scoop prefix scoop    # typically: ~\scoop\apps\scoop\current
+# --- Tokenize ArgLine safely (handles quotes, spaces) ---
+$toks = [System.Management.Automation.PSParser]::Tokenize($ArgLine, [ref]$null)
 
-if ($help) {
-    $checkverPath = Join-Path $SCOOPROOT 'bin\checkver.ps1'
-    if (Test-Path $checkverPath) {
-        $lines = Get-Content $checkverPath
-
-        # Extract .PARAMETER descriptions from comment block, skipping .EXAMPLE sections
-        $paramDescs = @{}
-        $inComment = $false
-        $currentParam = $null
-        $foundParams = @()
-        $inExample = $false
-        foreach ($line in $lines) {
-            if ($line -match '^<#') { $inComment = $true; continue }
-            if ($line -match '^#>') { $inComment = $false; break }
-            if ($inComment) {
-                if ($line -match '^\s*\.EXAMPLE') { $inExample = $true; $currentParam = $null; continue }
-                if ($inExample) {
-                    if ($line -match '^\s*$') { $inExample = $false }
-                    continue
-                }
-                if ($line -match '^\s*\.PARAMETER\s+(\w+)') {
-                    $currentParam = $Matches[1]
-                    $paramDescs[$currentParam] = ""
-                    $foundParams += $currentParam
-                } elseif ($currentParam -and $line -match '^\s{4,}(.*\S.*)$') {
-                    $paramDescs[$currentParam] += ($paramDescs[$currentParam] ? " " : "") + $Matches[1].Trim()
-                } elseif ($currentParam -and $line -match '^\s*$') {
-                    $currentParam = $null
-                }
-            }
-        }
-
-        Write-Host "USAGE: checkver.ps1 -Args '<params>'"
-        Write-Host ""
-        Write-Host "Parameters found in offical checkver.ps1:"
-        $maxlen = 0
-        foreach ($p in $foundParams) {
-            $len = ("  -" + $p).Length
-            if ($len -gt $maxlen) { $maxlen = $len }
-        }
-        foreach ($p in $foundParams) {
-            $desc = $paramDescs[$p]
-            $paramStr = "  -$p"
-            if ($desc) {
-                $pad = " " * ($maxlen - $paramStr.Length + 2)
-                Write-Host ("$paramStr$pad$desc")
-            } else {
-                Write-Host $paramStr
-            }
-        }
-        Write-Host ""
-        Write-Host "Special wrapper arguments handled locally: -help, -verbose"
-        Write-Host ""
-        Write-Host "Example:"
-        Write-Host "  .\checkver.ps1 -Args '-u -Dir D:\Dev\meibye-bucket\bucket'"
-        Write-Host "  .\checkver.ps1 -Args '-help'"
-    } else {
-        Write-Host "Could not find checkver.ps1 at $checkverPath"
+# Build a token list that represents argv (strings of tokens)
+$argv = @()
+foreach ($t in $toks) {
+    switch ($t.Type.ToString()) {
+        'Command'          { $argv += $t.Content }
+        'CommandParameter' { $argv += $t.Content }
+        'CommandArgument'  { $argv += $t.Content }
+        'String'           { $argv += $t.Content }
+        'Number'           { $argv += $t.Content }
+        default { } # ignore punctuation like commas, parens, etc.
     }
+    # Check for -help or --help (case-insensitive)
+    if ($t.Content -match '^(--?help)$') {
+        $LocalOnlyParams.Help = $true
+    }
+    # Check for -detail or --detail (case-insensitive)
+    if ($t.Content -match '^(--?detail)$') {
+        $LocalOnlyParams.Detail = $true
+    }
+    # Check for -dryrun or --dryrun (case-insensitive)
+    if ($t.Content -match '^(--?dryrun)$') {
+        $LocalOnlyParams.DryRun = $true
+    }
+}
+
+# --- Define expected parameters and their default values ---
+if ($LocalOnlyParams.Help)    { Write-Host "Help:      ON" }
+if ($LocalOnlyParams.Detail)  { Write-Host "Detail:    ON" }
+if ($LocalOnlyParams.DryRun)  { Write-Host "DryRun:    ON" }
+
+# Print help if requested ---
+if ($LocalOnlyParams.Help) {
+    Write-Host "USAGE: checkver.ps1 -Args '<params>'"
+    Write-Host ""
+    Write-Host "Parameters:"
+    Write-Host "  -App           The app manifest name or pattern (default: *)"
+    Write-Host "  -Dir           Path to bucket directory (default: D:\Dev\meibye-bucket\bucket)"
+    Write-Host "  -Update        Update manifest(s)"
+    Write-Host "  -ForceUpdate   Force update even if unchanged"
+    Write-Host "  -SkipUpdated   Skip already updated manifests"
+    Write-Host "  -Version       Specify version"
+    Write-Host "  -ThrowError    Throw on error"
+    Write-Host ""
+    Write-Host "Special wrapper arguments handled locally: -help, -detail, -dryrun"
+    Write-Host ""
+    Write-Host "Example:"
+    Write-Host "  .\checkver.ps1 -Args 'apps-bucket-scan -Dir D:\Dev\meibye-bucket\bucket'"
+    Write-Host "  .\checkver.ps1 -Args '-help'"
     exit 0
 }
 
-# Default Dir logic: if -Dir is not present, insert default before verbose print
-$dirIdx = $null
-for ($i = 0; $i -lt $remainingArgs.Count; $i++) {
-    if ($remainingArgs[$i] -ieq '-Dir' -and ($i + 1) -lt $remainingArgs.Count) {
-        $dirIdx = $i
-        break
+# Define the mapping of positional arguments to named parameters. Local only params should be included.
+$paramMapping = @(
+    @{ Name = '-App'; Type = 'String'; Default = '*'; Mandatory = $true },
+    @{ Name = '-Dir'; Type = 'String'; Default = 'D:\Dev\meibye-bucket\bucket'; Mandatory = $true },
+    @{ Name = '-Update'; Type = 'Switch'; Default = $false; Mandatory = $false },
+    @{ Name = '-ForceUpdate'; Type = 'Switch'; Default = $false; Mandatory = $false },
+    @{ Name = '-SkipUpdated'; Type = 'Switch'; Default = $false; Mandatory = $false },
+    @{ Name = '-Version'; Type = 'String'; Default = $false; Mandatory = $false },
+    @{ Name = '-ThrowError'; Type = 'Switch'; Default = $false; Mandatory = $false },
+    @{ Name = '-Help'; Type = 'Switch'; Default = $false; Mandatory = $false },
+    @{ Name = '-Detail'; Type = 'Switch'; Default = $false; Mandatory = $false },
+    @{ Name = '-DryRun'; Type = 'Switch'; Default = $false; Mandatory = $false }
+)
+
+# Convert positional arguments to named arguments
+$namedArgs = @{}
+$positionalIndex = 0
+for ($i = 0; $i -lt $argv.Count; $i++) {
+    if ($argv[$i] -like '-*') {
+        # Named argument, add it directly.
+        $param = $paramMapping | Where-Object { $_.Name -eq $argv[$i] }
+        if ($param -and $param.Type -eq 'Switch') {
+            $namedArgs[$argv[$i]] = $true
+        } elseif (($i + 1) -lt $argv.Count -and $argv[$i + 1] -notlike '-*') {
+            $namedArgs[$argv[$i]] = $argv[$i + 1]
+        } else {
+            $namedArgs[$argv[$i]] = $true
+        }
+    } else {
+        # Positional argument, map it to the corresponding named parameter
+        if ($positionalIndex -lt $paramMapping.Count) {
+            $param = $paramMapping[$positionalIndex]
+            $namedArgs[$param.Name] = $argv[$i]
+            $positionalIndex++
+        }
     }
 }
-$hasValidDir = $false
-if ($dirIdx -ne $null) {
-    $dirValue = $remainingArgs[$dirIdx + 1]
-    if ($dirValue -and (Test-Path $dirValue -PathType Container)) {
-        $hasValidDir = $true
+
+# Ensure all required named parameters are present (only those with a Default not equal to $false)
+foreach ($param in $paramMapping) {
+    if ($param.Mandatory -and -not $namedArgs.ContainsKey($param.Name)) {
+        $namedArgs[$param.Name] = $param.Default
     }
 }
-if (-not $hasValidDir) {
-    $remainingArgs = @('-Dir', 'D:\Dev\meibye-bucket\bucket') + $remainingArgs
+
+# Remove local-only parameters from the final argument list
+$localParams = @('-Help', '-Detail', '-DryRun')
+$finalArgs = @()
+foreach ($key in $namedArgs.Keys) {
+    if ($localParams -notcontains $key) {
+        $finalArgs += $key
+        if ($namedArgs[$key] -ne $true) {
+            $finalArgs += $namedArgs[$key]
+        }
+    }
 }
 
-if ($verbose) {
-    Write-Host "PARAMETERS:"
-    Write-Host "  Args: $Args"
-    Write-Host "  Parsed: $($argsList -join ', ')"
-    Write-Host "  Remaining: $($remainingArgs -join ', ')"
-    Write-Host "  help: $help"
-    Write-Host "  verbose: $verbose"
+# --- Determine path to scoop checkver script --- 
+$SCOOPROOT = scoop prefix scoop
+$checkverPath = Join-Path $SCOOPROOT 'bin\checkver.ps1'
+if (-not (Test-Path $checkverPath)) {
+    Write-Error "Could not find checkver.ps1 at expected path: $checkverPath"
+    exit 1
+}
+# Detail output if requested ---
+if ($LocalOnlyParams.Detail) {
+    Write-Host "DETAIL MODE:"
+    Write-Host "  ArgLine: $ArgLine"
+    Write-Host "  Parsed argv:"
+    # Find max length for argument values for alignment
+    $maxArgLen = 0
+    for ($i = 0; $i -lt $argv.Count; $i++) {
+        if ($argv[$i].Length -gt $maxArgLen) { $maxArgLen = $argv[$i].Length }
+    }
+    for ($i = 0; $i -lt $argv.Count; $i++) {
+        $pad = ' ' * ($maxArgLen - $argv[$i].Length)
+        Write-Host ("    {0}{1}" -f $argv[$i], $pad)
+    }
+    Write-Host "  Named arguments:"
+    foreach ($key in $namedArgs.Keys) {
+        Write-Host "    $key = $($namedArgs[$key])"
+    }
+    Write-Host "  Final arguments passed to checkver.ps1:"
+    Write-Host "    $($finalArgs -join ' ')"
+    Write-Host "  LocalOnlyParams: $(($LocalOnlyParams.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }) -join ', ')"
+    Write-Host "  Command: & `"$checkverPath`" $($finalArgs -join ' ')"
 }
 
-# Run checkver.ps1 against your bucket
-& "$SCOOPROOT\bin\checkver.ps1" @remainingArgs
+# Execute checkver.ps1 with the final argument list ---
+if ($LocalOnlyParams.DryRun) {
+    Write-Host "DRY RUN Arguments: $($finalArgs -join ' ')"
+    exit 0
+} else {
+    & $checkverPath @finalArgs
+}
