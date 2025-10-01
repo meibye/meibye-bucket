@@ -80,8 +80,13 @@ $mapFile = Join-Path $stateDir 'shims-map.csv'
 if (Test-Path $stateFile) { Remove-Item $stateFile -Force }
 if (Test-Path $mapFile) { Remove-Item $mapFile -Force }
 
+# Writes the name of a created shim to the state file, unless in dry-run mode.
 function Write-State([string]$name) { if (-not $dryRun) { Add-Content -Path $stateFile -Value $name } }
+
+# Initializes the CSV summary map file with the header row.
 function Initialize-Map() { 'shim,type,family,app,plugin,leaf,ext,version,interpreter,target,dryrun' | Out-File -Encoding UTF8 $mapFile }
+
+# Appends a row to the CSV summary map file for each shim, including its properties.
 function Write-Map($shim,$type,$family,$app,$plugin,$leaf,$ext,$ver,$interp,$target) {
     $row = @($shim,$type,$family,$app,$plugin,$leaf,$ext,$ver,$interp,$target,([int]$dryRun)) -join ','
     Add-Content -Path $mapFile -Value $row
@@ -98,9 +103,13 @@ $gitBash = 'C:\Program Files\Git\bin\bash.exe'
 $hasGitBash = Test-Path $gitBash
 $hasWsl = [bool](Get-Command wsl.exe -ErrorAction SilentlyContinue)
 
+# Adds a Scoop shim for the given script path, unless in dry-run mode.
 function Add-Shim($shim,$path) { if ($dryRun) { return } ; scoop shim add $shim $path | Out-Null }
+
+# Adds a Scoop shim for the given executable and arguments, unless in dry-run mode.
 function Add-Shim-Args($shim,$exe,$shimArgs) { if ($dryRun) { return } ; scoop shim add $shim $exe $shimArgs | Out-Null }
 
+# Resolves the version string for an app by inspecting the 'current' symlink or folder.
 function Resolve-Version($currentPath) {
     try {
         $it = Get-Item -LiteralPath $currentPath -ErrorAction Stop
@@ -113,12 +122,14 @@ function Resolve-Version($currentPath) {
     return ''
 }
 
+# Constructs a shim name based on family, app, plugin, leaf, and version.
 function New-ShimName($family,$app,$plugin,$leaf,$ver) {
     $base = if ($plugin) { "$family-$plugin-$leaf" } else { "$family-$app-$leaf" }
     if ($includeVersion -and $ver) { return ("$base-v$ver") }
     return $base
 }
 
+# Ensures shim name uniqueness by appending a numeric suffix if a collision is detected.
 function Get-UniqueShimName($name) {
     # Avoid collisions by appending -2, -3, ... if shim already exists
     $n = $name; $i = 2
@@ -203,6 +214,7 @@ Get-ChildItem -Path $Root -Directory | ForEach-Object {
     }
 }
 
+# Print summary information about the shim creation process and output files.
 Write-Host ("Meta-shims " + ($(if($dryRun){'planned'} else {'installed'}) + ". Summary map: " + $mapFile))
 if (-not $dryRun -and (Test-Path $stateFile)) {
     $n = (Get-Content $stateFile).Count
