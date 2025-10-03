@@ -3,7 +3,7 @@
   "description": "Scanner that generates Scoop manifests from installers under C:\\Tools\\apps.",
   "homepage": "https://github.com/meibye/meibye-bucket",
   "license": "MIT",
-  "url": "file:///D:/Dev/meibye-bucket/scripts/apps-bucket-scan.ps1",
+  "url": "https://raw.githubusercontent.com/meibye/meibye-bucket/master/scripts/apps-bucket-scan.ps1",
   "bin": [
       "apps-bucket-scan.ps1"
   ],

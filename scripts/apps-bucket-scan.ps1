@@ -7,6 +7,7 @@
     Shims are created using Scoop's 'shim add' command, with interpreter detection for PowerShell, Python, Git Bash, and WSL.
     The script supports filtering by family, including version in shim names, and dry-run mode.
     It outputs a summary CSV map and a state file listing all created shims to the specified bucket folder (default: D:\Dev\meibye-bucket\bucket).
+    If -VerboseHost is specified, the script prints detailed information about major function calls, parameters, decisions, and exits to the host.
 
 .PARAMETER Root
     (Optional) Root directory to scan for app families. Default: C:\Tools\apps
@@ -22,6 +23,9 @@
 
 .PARAMETER DryRun
     (Optional) Switch to only print plan and write summary map, without creating shims. Overrides $env:MEIBYE_META_DRYRUN if set.
+
+.PARAMETER VerboseHost
+    (Optional) Switch to enable verbose output to the host, showing major function calls, parameter values, decisions, and exits.
 
 .OUTPUTS
     - shims.txt: List of created shims (in OutBucket).
@@ -39,6 +43,9 @@
 
     # Dry run, only for 'py' and 'ps' families, include version in shim name
     .\apps-bucket-scan.ps1 -Families 'py,ps' -IncludeVersion -DryRun
+
+    # Run with verbose host output
+    .\apps-bucket-scan.ps1 -VerboseHost
 #>
 
 param(
@@ -46,7 +53,8 @@ param(
     [string]$OutBucket = 'D:\Dev\meibye-bucket\bucket',
     [string]$Families,
     [switch]$IncludeVersion,
-    [switch]$DryRun
+    [switch]$DryRun,
+    [switch]$VerboseHost  # Optional: enable verbose output to host
 )
 
 $ErrorActionPreference = 'Stop'
@@ -81,18 +89,28 @@ if (Test-Path $stateFile) { Remove-Item $stateFile -Force }
 if (Test-Path $mapFile) { Remove-Item $mapFile -Force }
 
 # Writes the name of a created shim to the state file, unless in dry-run mode.
-function Write-State([string]$name) { if (-not $dryRun) { Add-Content -Path $stateFile -Value $name } }
-
-# Initializes the CSV summary map file with the header row.
-function Initialize-Map() { 'shim,type,family,app,plugin,leaf,ext,version,interpreter,target,dryrun' | Out-File -Encoding UTF8 $mapFile }
-
-# Appends a row to the CSV summary map file for each shim, including its properties.
-function Write-Map($shim,$type,$family,$app,$plugin,$leaf,$ext,$ver,$interp,$target) {
-    $row = @($shim,$type,$family,$app,$plugin,$leaf,$ext,$ver,$interp,$target,([int]$dryRun)) -join ','
-    Add-Content -Path $mapFile -Value $row
+function Write-State([string]$name) {
+    if ($script:VerboseHost) { Write-Host "[Write-State] Called with name=$name" }
+    if (-not $dryRun) { Add-Content -Path $stateFile -Value $name }
+    if ($script:VerboseHost) { Write-Host "[Write-State] Exit" }
 }
 
-Initialize-Map
+# Initializes the CSV summary map file with the header row.
+function Initialize-Map() {
+    if ($script:VerboseHost) { Write-Host "[Initialize-Map] Called" }
+    'shim,type,family,app,tool,leaf,ext,version,interpreter,target,dryrun' | Out-File -Encoding UTF8 $mapFile
+    if ($script:VerboseHost) { Write-Host "[Initialize-Map] Exit" }
+}
+
+# Appends a row to the CSV summary map file for each shim, including its properties.
+function Write-Map($shim,$type,$family,$app,$tool,$leaf,$ext,$ver,$interp,$target) {
+    if ($script:VerboseHost) {
+        Write-Host "[Write-Map] Called with shim=$shim, type=$type, family=$family, app=$app, tool=$tool, leaf=$leaf, ext=$ext, ver=$ver, interp=$interp, target=$target"
+    }
+    $row = @($shim,$type,$family,$app,$tool,$leaf,$ext,$ver,$interp,$target,([int]$dryRun)) -join ','
+    Add-Content -Path $mapFile -Value $row
+    if ($script:VerboseHost) { Write-Host "[Write-Map] Exit" }
+}
 
 # Detect interpreters
 $pwsh = (Get-Command pwsh.exe -ErrorAction SilentlyContinue)?.Source
@@ -104,37 +122,62 @@ $hasGitBash = Test-Path $gitBash
 $hasWsl = [bool](Get-Command wsl.exe -ErrorAction SilentlyContinue)
 
 # Adds a Scoop shim for the given script path, unless in dry-run mode.
-function Add-Shim($shim,$path) { if ($dryRun) { return } ; scoop shim add $shim $path | Out-Null }
+function Add-Shim($shim,$path) {
+    if ($script:VerboseHost) { Write-Host "[Add-Shim] Called with shim=$shim, path=$path" }
+    if ($dryRun) { if ($script:VerboseHost) { Write-Host "[Add-Shim] Dry run, skipping actual shim add" }; return }
+    scoop shim add $shim $path | Out-Null
+    if ($script:VerboseHost) { Write-Host "[Add-Shim] Exit" }
+}
 
 # Adds a Scoop shim for the given executable and arguments, unless in dry-run mode.
-function Add-Shim-Args($shim,$exe,$shimArgs) { if ($dryRun) { return } ; scoop shim add $shim $exe $shimArgs | Out-Null }
+function Add-Shim-Args($shim,$exe,$shimArgs) {
+    if ($script:VerboseHost) { Write-Host "[Add-Shim-Args] Called with shim=$shim, exe=$exe, shimArgs=$shimArgs" }
+    if ($dryRun) { if ($script:VerboseHost) { Write-Host "[Add-Shim-Args] Dry run, skipping actual shim add" }; return }
+    scoop shim add $shim $exe $shimArgs | Out-Null
+    if ($script:VerboseHost) { Write-Host "[Add-Shim-Args] Exit" }
+}
 
 # Resolves the version string for an app by inspecting the 'current' symlink or folder.
 function Resolve-Version($currentPath) {
+    if ($script:VerboseHost) { Write-Host "[Resolve-Version] Called with currentPath=$currentPath" }
     try {
         $it = Get-Item -LiteralPath $currentPath -ErrorAction Stop
         if ($it.Attributes -band [IO.FileAttributes]::ReparsePoint) {
             $t = (Get-Item -LiteralPath $currentPath).Target
-            if ($t) { return Split-Path -Leaf $t }
+            if ($t) {
+                if ($script:VerboseHost) { Write-Host "[Resolve-Version] Found symlink target: $t" }
+                return Split-Path -Leaf $t
+            }
         }
-    } catch { }
-    # Fallback: last non-'current' segment if path is already a version folder
+    } catch {
+        if ($script:VerboseHost) { Write-Host "[Resolve-Version] Exception: $_" }
+    }
+    if ($script:VerboseHost) { Write-Host "[Resolve-Version] Fallback: returning empty string" }
     return ''
 }
 
 # Constructs a shim name based on family, app, plugin, leaf, and version.
 function New-ShimName($family,$app,$plugin,$leaf,$ver) {
+    if ($script:VerboseHost) { Write-Host "[New-ShimName] Called with family=$family, app=$app, plugin=$plugin, leaf=$leaf, ver=$ver" }
     $base = if ($plugin) { "$family-$plugin-$leaf" } else { "$family-$app-$leaf" }
-    if ($includeVersion -and $ver) { return ("$base-v$ver") }
+    if ($includeVersion -and $ver) { 
+        if ($script:VerboseHost) { Write-Host "[New-ShimName] Including version in shim name" }
+        return ("$base-v$ver")
+    }
+    if ($script:VerboseHost) { Write-Host "[New-ShimName] Exit with base=$base" }
     return $base
 }
 
 # Ensures shim name uniqueness by appending a numeric suffix if a collision is detected.
 function Get-UniqueShimName($name) {
-    # Avoid collisions by appending -2, -3, ... if shim already exists
+    if ($script:VerboseHost) { Write-Host "[Get-UniqueShimName] Called with name=$name" }
     $n = $name; $i = 2
     $shimsDir = Join-Path (scoop prefix scoop) 'shims'
-    while (Test-Path (Join-Path $shimsDir ($n + '.exe'))) { $n = "$name-$i"; $i++ }
+    while (Test-Path (Join-Path $shimsDir ($n + '.exe'))) {
+        if ($script:VerboseHost) { Write-Host "[Get-UniqueShimName] Collision detected for $n, incrementing" }
+        $n = "$name-$i"; $i++
+    }
+    if ($script:VerboseHost) { Write-Host "[Get-UniqueShimName] Exit with unique name $n" }
     return $n
 }
 
@@ -142,74 +185,124 @@ if (-not (Test-Path $Root)) { Write-Warning "Root not found: $Root"; return }
 
 Get-ChildItem -Path $Root -Directory | ForEach-Object {
     $family = $_.Name
-    if ($familiesList.Count -gt 0 -and ($familiesList -notcontains $family)) { return }
+    if ($script:VerboseHost) { Write-Host "[Family] Processing family: $family" }
+    if ($familiesList.Count -gt 0 -and ($familiesList -notcontains $family)) { 
+        if ($script:VerboseHost) { Write-Host "[Family] Skipping family $family (not in filter list)" }
+        return 
+    }
     Get-ChildItem -Path $_.FullName -Directory | ForEach-Object {
         $app = $_.Name
+        if ($script:VerboseHost) { Write-Host "[App] Processing app: $app" }
         $current = Join-Path $_.FullName 'current'
-        if (!(Test-Path $current)) { return }
+        if (!(Test-Path $current)) { 
+            if ($script:VerboseHost) { Write-Host "[App] Skipping app $app (no 'current' directory)" }
+            return 
+        }
         $ver = Resolve-Version $current
 
-        function Invoke-Files($files,$pluginName) {
+        function Invoke-Files($files,$tool) {
+            if ($script:VerboseHost) { Write-Host "[Invoke-Files] Called with tool=$tool, files count=$($files.Count)" }
             foreach ($f in $files) {
                 $leaf = [IO.Path]::GetFileNameWithoutExtension($f.Name)
                 $ext = $f.Extension.ToLower()
-                $shimBase = New-ShimName $family $app $pluginName $leaf $ver
+                $shimBase = New-ShimName $family $app $tool $leaf $ver
                 $shim = Get-UniqueShimName $shimBase
+                if ($script:VerboseHost) { Write-Host "[Invoke-Files] Processing $($f.FullName) as $shim ($ext)" }
                 switch ($ext) {
                     '.ps1' {
                         $interp = 'pwsh'
-                        if ($pwsh) { Add-Shim-Args $shim $pwsh "-NoProfile -ExecutionPolicy Bypass -File `"$($f.FullName)`" -- %*" }
-                        else { $interp = 'direct'; Add-Shim $shim $f.FullName }
-                        Write-Map $shim 'root' $family $app $pluginName $leaf $ext $ver $interp $($f.FullName)
+                        if ($pwsh) { 
+                            if ($script:VerboseHost) { Write-Host "[Invoke-Files] Adding PowerShell shim for $($f.FullName) with pwsh" }
+                            Add-Shim-Args $shim $pwsh "-NoProfile -ExecutionPolicy Bypass -File `"$($f.FullName)`" -- %*" 
+                        }
+                        else { 
+                            if ($script:VerboseHost) { Write-Host "[Invoke-Files] Adding PowerShell shim for $($f.FullName) direct" }
+                            $interp = 'direct'; Add-Shim $shim $f.FullName 
+                        }
+                        Write-Map $shim 'root' $family $app $tool $leaf $ext $ver $interp $($f.FullName)
                         Write-State $shim
                     }
                     '.py' {
                         $interp = if ($py) { 'py' } elseif ($python) { 'python' } else { 'direct' }
-                        if ($py) { Add-Shim-Args $shim $py "-3 `"$($f.FullName)`" %*" }
-                        elseif ($python) { Add-Shim-Args $shim $python "`"$($f.FullName)`" %*" }
-                        else { Add-Shim $shim $f.FullName }
-                        Write-Map $shim 'root' $family $app $pluginName $leaf $ext $ver $interp $($f.FullName)
+                        if ($py) { 
+                            if ($script:VerboseHost) { Write-Host "[Invoke-Files] Adding Python shim for $($f.FullName) with py" }
+                            Add-Shim-Args $shim $py "-3 `"$($f.FullName)`" %*" 
+                        }
+                        elseif ($python) { 
+                            if ($script:VerboseHost) { Write-Host "[Invoke-Files] Adding Python shim for $($f.FullName) with python" }
+                            Add-Shim-Args $shim $python "`"$($f.FullName)`" %*" 
+                        }
+                        else { 
+                            if ($script:VerboseHost) { Write-Host "[Invoke-Files] Adding Python shim for $($f.FullName) direct" }
+                            Add-Shim $shim $f.FullName 
+                        }
+                        Write-Map $shim 'root' $family $app $tool $leaf $ext $ver $interp $($f.FullName)
                         Write-State $shim
                     }
-                    '.cmd' { Add-Shim $shim $f.FullName; Write-Map $shim 'root' $family $app $pluginName $leaf $ext $ver 'direct' $($f.FullName); Write-State $shim }
-                    '.bat' { Add-Shim $shim $f.FullName; Write-Map $shim 'root' $family $app $pluginName $leaf $ext $ver 'direct' $($f.FullName); Write-State $shim }
+                    '.cmd' { 
+                        if ($script:VerboseHost) { Write-Host "[Invoke-Files] Adding CMD shim for $($f.FullName)" }
+                        Add-Shim $shim $f.FullName
+                        Write-Map $shim 'root' $family $app $tool $leaf $ext $ver 'direct' $($f.FullName)
+                        Write-State $shim 
+                    }
+                    '.bat' { 
+                        if ($script:VerboseHost) { Write-Host "[Invoke-Files] Adding BAT shim for $($f.FullName)" }
+                        Add-Shim $shim $f.FullName
+                        Write-Map $shim 'root' $family $app $tool $leaf $ext $ver 'direct' $($f.FullName)
+                        Write-State $shim 
+                    }
                     '.sh' {
                         if ($hasGitBash) {
+                            if ($script:VerboseHost) { Write-Host "[Invoke-Files] Adding SH shim for $($f.FullName) with Git Bash" }
                             $posix = $f.FullName -replace '\\','/'
                             Add-Shim-Args $shim $gitBash "-c `"`"$posix`" %*`""
-                            Write-Map $shim 'root' $family $app $pluginName $leaf $ext $ver 'git-bash' $($f.FullName)
+                            Write-Map $shim 'root' $family $app $tool $leaf $ext $ver 'git-bash' $($f.FullName)
                             Write-State $shim
                         } elseif ($hasWsl) {
+                            if ($script:VerboseHost) { Write-Host "[Invoke-Files] Adding SH shim for $($f.FullName) with WSL bash" }
                             $posix = $f.FullName -replace '\\','/'
                             Add-Shim-Args $shim 'wsl.exe' "bash -lc `"`"$posix`" %*`""
-                            Write-Map $shim 'root' $family $app $pluginName $leaf $ext $ver 'wsl-bash' $($f.FullName)
+                            Write-Map $shim 'root' $family $app $tool $leaf $ext $ver 'wsl-bash' $($f.FullName)
                             Write-State $shim
-                        } else { Write-Warning "Skipping .sh: $($f.Name) — no Git Bash/WSL found" }
+                        } else { 
+                            Write-Warning "Skipping .sh: $($f.Name) — no Git Bash/WSL found" 
+                            if ($script:VerboseHost) { Write-Host "[Invoke-Files] Skipping SH file $($f.FullName) (no Git Bash/WSL found)" }
+                        }
                     }
                     '.zsh' {
                         if ($hasWsl) {
+                            if ($script:VerboseHost) { Write-Host "[Invoke-Files] Adding ZSH shim for $($f.FullName) with WSL zsh" }
                             $posix = $f.FullName -replace '\\','/'
                             Add-Shim-Args $shim 'wsl.exe' "zsh -lc `"`"$posix`" %*`""
-                            Write-Map $shim 'root' $family $app $pluginName $leaf $ext $ver 'wsl-zsh' $($f.FullName)
+                            Write-Map $shim 'root' $family $app $tool $leaf $ext $ver 'wsl-zsh' $($f.FullName)
                             Write-State $shim
-                        } else { Write-Warning "Skipping .zsh: $($f.Name) — no WSL zsh found" }
+                        } else { 
+                            Write-Warning "Skipping .zsh: $($f.Name) — no WSL zsh found" 
+                            if ($script:VerboseHost) { Write-Host "[Invoke-Files] Skipping ZSH file $($f.FullName) (no WSL zsh found)" }
+                        }
                     }
                 }
             }
+            if ($script:VerboseHost) { Write-Host "[Invoke-Files] Exit" }
         }
 
         # 1) Root-level scripts in current
-        $rootFiles = Get-ChildItem -Path $current -File -Include *.ps1,*.py,*.cmd,*.bat,*.sh,*.zsh -ErrorAction SilentlyContinue
+        $rootFiles = Get-ChildItem -Path $current\* -File -Include *.ps1,*.py,*.cmd,*.bat,*.sh,*.zsh -ErrorAction SilentlyContinue
+        if ($script:VerboseHost) { Write-Host "[App] Scanning root-level scripts in $current" }
         Invoke-Files $rootFiles $null
 
-        # 2) Plugin scripts
-        $plugins = Join-Path $current 'plugins'
-        if (Test-Path $plugins) {
-            Get-ChildItem -Path $plugins -Directory | ForEach-Object {
-                $plugin = $_.Name
-                $pfiles = Get-ChildItem -Path $_.FullName -File -Recurse -Include *.ps1,*.py,*.cmd,*.bat,*.sh,*.zsh -ErrorAction SilentlyContinue
-                Invoke-Files $pfiles $plugin
+        # 2) Tool scripts (was plugins)
+        $tools = Join-Path $current 'plugins'
+        if (Test-Path $tools) {
+            if ($script:VerboseHost) { Write-Host "[App] Scanning tools in $tools" }
+            Get-ChildItem -Path $tools -Directory | ForEach-Object {
+                $tool = $_.Name
+                if ($script:VerboseHost) { Write-Host "[Tool] Processing tool: $tool" }
+                $tfiles = Get-ChildItem -Path $_.FullName -File -Recurse -Include *.ps1,*.py,*.cmd,*.bat,*.sh,*.zsh -ErrorAction SilentlyContinue
+                Invoke-Files $tfiles $tool
             }
+        } else {
+            if ($script:VerboseHost) { Write-Host "[App] No tools directory found in $current" }
         }
     }
 }
