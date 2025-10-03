@@ -78,8 +78,8 @@ if ($envFamilies) {
     $familiesList = @()
 }
 
-$includeVersion = $envIncludeVersion
-$dryRun = $envDryRun
+$includeVersion = [bool]$envIncludeVersion
+$dryRun = [bool]$envDryRun
 
 $stateDir = $OutBucket
 New-Item -ItemType Directory -Force -Path $stateDir | Out-Null
