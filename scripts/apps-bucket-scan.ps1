@@ -79,7 +79,7 @@ if ($envFamilies) {
 }
 
 $includeVersion = [bool]($IncludeVersion.IsPresent -or $envIncludeVersion)
-$dryRun = [bool]($DryRun.IsPresent -or $envDryRun)
+$isDryRun = [bool]($DryRun.IsPresent -or $envDryRun)
 
 $stateDir = $OutBucket
 New-Item -ItemType Directory -Force -Path $stateDir | Out-Null
@@ -91,14 +91,14 @@ if (Test-Path $mapFile) { Remove-Item $mapFile -Force }
 # Writes the name of a created shim to the state file, unless in dry-run mode.
 function Write-State([string]$name) {
     if ($script:VerboseHost) { Write-Host "[Write-State] Called with name=$name" }
-    if (-not $dryRun) { Add-Content -Path $stateFile -Value $name }
+    if (-not $isDryRun) { Add-Content -Path $stateFile -Value $name }
     if ($script:VerboseHost) { Write-Host "[Write-State] Exit" }
 }
 
 # Initializes the CSV summary map file with the header row.
 function Initialize-Map() {
     if ($script:VerboseHost) { Write-Host "[Initialize-Map] Called" }
-    'shim,type,family,app,tool,leaf,ext,version,interpreter,target,dryrun' | Out-File -Encoding UTF8 $mapFile
+    'shim,type,family,app,tool,leaf,ext,version,interpreter,target,isDryRun' | Out-File -Encoding UTF8 $mapFile
     if ($script:VerboseHost) { Write-Host "[Initialize-Map] Exit" }
 }
 
@@ -107,7 +107,7 @@ function Write-Map($shim,$type,$family,$app,$tool,$leaf,$ext,$ver,$interp,$targe
     if ($script:VerboseHost) {
         Write-Host "[Write-Map] Called with shim=$shim, type=$type, family=$family, app=$app, tool=$tool, leaf=$leaf, ext=$ext, ver=$ver, interp=$interp, target=$target"
     }
-    $row = @($shim,$type,$family,$app,$tool,$leaf,$ext,$ver,$interp,$target,([int]$dryRun)) -join ','
+    $row = @($shim,$type,$family,$app,$tool,$leaf,$ext,$ver,$interp,$target,([int]$isDryRun)) -join ','
     Add-Content -Path $mapFile -Value $row
     if ($script:VerboseHost) { Write-Host "[Write-Map] Exit" }
 }
@@ -124,7 +124,7 @@ $hasWsl = [bool](Get-Command wsl.exe -ErrorAction SilentlyContinue)
 # Adds a Scoop shim for the given script path, unless in dry-run mode.
 function Add-Shim($shim,$path) {
     if ($script:VerboseHost) { Write-Host "[Add-Shim] Called with shim=$shim, path=$path" }
-    if ($dryRun) { if ($script:VerboseHost) { Write-Host "[Add-Shim] Dry run, skipping actual shim add" }; return }
+    if ($isDryRun) { if ($script:VerboseHost) { Write-Host "[Add-Shim] Dry run, skipping actual shim add" }; return }
     scoop shim add $shim $path | Out-Null
     if ($script:VerboseHost) { Write-Host "[Add-Shim] Exit" }
 }
@@ -132,7 +132,7 @@ function Add-Shim($shim,$path) {
 # Adds a Scoop shim for the given executable and arguments, unless in dry-run mode.
 function Add-Shim-Args($shim,$exe,$shimArgs) {
     if ($script:VerboseHost) { Write-Host "[Add-Shim-Args] Called with shim=$shim, exe=$exe, shimArgs=$shimArgs" }
-    if ($dryRun) { if ($script:VerboseHost) { Write-Host "[Add-Shim-Args] Dry run, skipping actual shim add" }; return }
+    if ($isDryRun) { if ($script:VerboseHost) { Write-Host "[Add-Shim-Args] Dry run, skipping actual shim add" }; return }
     scoop shim add $shim $exe $shimArgs | Out-Null
     if ($script:VerboseHost) { Write-Host "[Add-Shim-Args] Exit" }
 }
@@ -308,8 +308,8 @@ Get-ChildItem -Path $Root -Directory | ForEach-Object {
 }
 
 # Print summary information about the shim creation process and output files.
-Write-Host ("Meta-shims " + ($(if($dryRun){'planned'} else {'installed'}) + ". Summary map: " + $mapFile))
-if (-not $dryRun -and (Test-Path $stateFile)) {
+Write-Host ("Meta-shims " + ($(if($isDryRun){'planned'} else {'installed'}) + ". Summary map: " + $mapFile))
+if (-not $isDryRun -and (Test-Path $stateFile)) {
     $n = (Get-Content $stateFile).Count
     Write-Host ("Created $n shims. State file: $stateFile")
 }
