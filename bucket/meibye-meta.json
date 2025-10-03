@@ -1,5 +1,5 @@
 {
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Scanner that generates Scoop manifests from installers under C:\\Tools\\apps.",
   "homepage": "https://github.com/meibye/meibye-bucket",
   "license": "MIT",
