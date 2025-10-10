@@ -1,0 +1,9 @@
+{
+  "bin": "create-ai-kb-structure.ps1",
+  "description": "ai-kb (ps tool)",
+  "version": "0.0.1",
+  "url": "file:///D:\\Dev\\tooling-monorepo\\out\\artifacts\\ai-kb-0.0.1.zip",
+  "hash": "sha256:7F1C5D8989AE78060360FF7450424A34346ED2426521E4D6411FD93A8EEC57E2",
+  "homepage": "",
+  "license": "MIT"
+}

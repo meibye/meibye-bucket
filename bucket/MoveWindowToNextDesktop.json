@@ -1,0 +1,9 @@
+{
+  "bin": "MoveWindowToNextDesktop.ps1",
+  "description": "MoveWindowToNextDesktop (ps tool)",
+  "version": "0.0.1",
+  "url": "file:///D:\\Dev\\tooling-monorepo\\out\\artifacts\\MoveWindowToNextDesktop-0.0.1.zip",
+  "hash": "sha256:76519202EE2038403E6A2603C85C8E1631ABE370D6A28BC9641D6CC451A1A32A",
+  "homepage": "",
+  "license": "MIT"
+}
