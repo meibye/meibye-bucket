@@ -1,9 +1,11 @@
 {
-  "url": "file:///D:\\Dev\\tooling-monorepo\\out\\artifacts\\ClipToOneMoreStyle-0.0.1.zip",
+  "homepage": "",
   "hash": "sha256:5E3210702608834EA3755928C871927EF3185C85E0FC71796F7F8808A94F23B3",
-  "bin": "ClipToOneMoreStyle.ps1",
-  "version": "0.0.1",
-  "license": "MIT",
-  "description": "ClipToOneMoreStyle (onemore plugin)",
-  "homepage": ""
+  "version": "0.1.0",
+  "description": "ClipToOneMoreStyle.ps1 (plugin tool from ClipToOneMoreStyle)",
+  "bin": [
+    "ClipToOneMoreStyle.ps1"
+  ],
+  "url": "file:///D:\\Dev\\tooling-monorepo\\out\\artifacts\\ClipToOneMoreStyle-0.1.0.zip",
+  "license": "MIT"
 }

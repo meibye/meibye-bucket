@@ -1,9 +1,0 @@
-{
-  "url": "file:///D:\\Dev\\tooling-monorepo\\out\\artifacts\\tools-0.0.1.zip",
-  "hash": "sha256:A2C1C95A20137500564B569C437382B49DB98963392E165DBEE90A1573B20F03",
-  "bin": "winutil.ps1",
-  "version": "0.0.1",
-  "license": "MIT",
-  "description": "tools (ps tool)",
-  "homepage": ""
-}

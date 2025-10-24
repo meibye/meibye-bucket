@@ -1,0 +1,11 @@
+{
+  "hash": "sha256:E22B19B6DADC1B68F98E1B990172AB5C4BA7FF3D0ACE020ED7A2D9E10C120DCF",
+  "license": "MIT",
+  "homepage": "",
+  "description": "dev-unblock-script.ps1 (ps tool from tools)",
+  "version": "0.1.0",
+  "bin": [
+    "dev-unblock-script.ps1"
+  ],
+  "url": "file:///D:\\Dev\\tooling-monorepo\\out\\artifacts\\tools-0.1.0.zip"
+}
