@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "description": "ClipToOneMoreStyle.ps1 (plugin tool from ClipToOneMoreStyle)",
+  "homepage": "",
+  "license": "MIT",
+  "url": "https://github.com/meibye/tooling-monorepo/raw/main/out/artifacts/ClipToOneMoreStyle-0.0.1.zip",
+  "hash": "sha256:5E3210702608834EA3755928C871927EF3185C85E0FC71796F7F8808A94F23B3",
+  "bin": [
+    "ClipToOneMoreStyle.ps1"
+  ]
+}
